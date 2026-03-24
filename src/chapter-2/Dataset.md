@@ -110,6 +110,9 @@ tensor([9, 0, 0, 3, 0, 2, 7, 2, 5, 5, 0, 9, ...])
 
 ## 4. Data Ingestion Flow
 
+> Refer to [load_dataset_sample_flow_explained.py](https://github.com/lucyge2022/distributed-ml-examples/blob/main/ddp-testrun/load_dataset_sample_flow_explained.py) for showing a simple breakdown of dataset loading process.
+
+
 ```
 Binary file (on SSD)
     ↓ read bytes
