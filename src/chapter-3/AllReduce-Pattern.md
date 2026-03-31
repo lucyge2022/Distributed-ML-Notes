@@ -1,4 +1,4 @@
-# 1. Pattern 2 — AllReduce (Worker-Only)
+# 1. Pattern 2 — AllReduce (Data Parallel)
 
 ### When to use it
 
