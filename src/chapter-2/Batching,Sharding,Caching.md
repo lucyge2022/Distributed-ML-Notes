@@ -1,6 +1,6 @@
 # Chapter 2: Batching, Sharding & Caching
 
-> Reference implementation: [prepare_dataset.py](https://github.com/lucyge2022/distributed-ml-examples/blob/main/ddp-testrun/prepare_dataset.py)
+> Reference implementation: [prepare_dataset.py](https://github.com/lucyge2022/llm-data-bench/blob/main/prepare_dataset.py)
 
 ---
 
