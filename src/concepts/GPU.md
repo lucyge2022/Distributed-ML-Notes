@@ -134,3 +134,78 @@ Everything else waits for this!
 | VRAM internal | 2,000 GB/s |
 
 > The entire pipeline runs at the speed of its slowest link — SSD read speed dominates.
+
+---
+
+## 6. Reading `nvidia-smi` — GPU Utilization vs Power Draw
+
+```
++-----------------------------------------------------------------------------------------+
+
+| NVIDIA-SMI 535.104.05             Driver Version: 535.104.05   CUDA Version: 12.2       |
+|-----------------------------------------+----------------------+------------------------+
+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC   |
+| Fan  Temp   Perf          Pwr:Draw / Limit |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M.   |
+|=========================================+======================+========================+
+
+|   0  NVIDIA A100-SXM4-80GB          On  | 00000000:00:04.0 Off |                    0   |
+| N/A   42C    P0             143W / 400W |  45120MiB / 81920MiB |     87%      Default   |
+|                                         |                      |                  Disabled|
++-----------------------------------------+----------------------+------------------------+
+                                                                                          
++-----------------------------------------------------------------------------------------+
+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0  N/A  N/A      14832      C   python3                                     45110MiB |
++-----------------------------------------------------------------------------------------+
+```
+
+### What each field means
+
+| Field | Value | Meaning |
+|---|---|---|
+| `Pwr:Draw / Limit` | 143W / 400W | Currently consuming 143W out of a 400W budget |
+| `Memory-Usage` | 45120MiB / 81920MiB | ~55% of 80GB VRAM in use |
+| `GPU-Util` | 87% | Over the last 1-second window, the GPU had at least one active kernel 87% of the time |
+
+### Why Power Draw is the better busyness signal
+
+**GPU-Util measures time occupancy, not compute intensity.**
+
+It answers: *"Was the GPU doing anything?"* — not *"Was it doing it hard?"*
+
+A GPU that processes one tiny kernel every millisecond and then idles for the rest of that millisecond will report 100% utilization. It is technically never idle, but it is barely working.
+
+**Power Draw measures actual silicon activity.**
+
+When Tensor Cores are running dense matrix multiplications at full throughput, they draw close to TDP (400W on an A100). When the GPU is waiting for data from CPU or doing lightweight work, power stays low regardless of what utilization reports.
+
+```
+GPU-Util 87%, Power 143W / 400W (36%)
+→ GPU is rarely idle (high util) but is doing lightweight work each time it wakes up
+→ bottleneck is likely: CPU overhead, data loading, or small batch sizes starving the Tensor Cores
+```
+
+### The Ferrari analogy
+
+Think of the GPU as a Ferrari in city traffic:
+
+- **GPU Utilization (87%)** = engine is on and wheels are rolling 87% of the time. Technically "utilizing" the car.
+- **Power Draw (36%)** = fuel consumption. Crawling at 15 mph barely touches the gas pedal — almost no fuel burned even though the car is constantly in motion.
+
+To reach 400W, you need the open racetrack: large batch sizes, no CPU bottleneck, Tensor Cores saturated with dense compute.
+
+### What high util + low power tells you to fix
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| High util, low power | Small batches — GPU wakes, does tiny work, idles briefly | Increase batch size |
+| High util, low power | CPU data preprocessing can't keep up | More DataLoader workers, prefetch |
+| High util, low power | Python overhead between kernel launches | Move logic into CUDA kernels, use `torch.compile` |
+| Low util, low power | GPU starved waiting for data | Fix I/O pipeline — SSD speed, caching, prefetch |
+| High util, high power | GPU fully saturated | ✓ this is what you want |
