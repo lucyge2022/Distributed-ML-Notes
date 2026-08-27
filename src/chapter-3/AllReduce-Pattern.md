@@ -60,6 +60,30 @@ Problem: W1 becomes a bottleneck — single point of failure,
          receives ALL traffic, does ALL computation.
 ```
 
+### Collective Communication Terminology
+
+| Primitive | Direction | Data Flow | What happens | Result |
+|---|---|---|---|---|
+| **Broadcast** | 1 → N | 1 GPU sends, N GPUs receive | Copy | Every GPU gets the same data (from the sender) |
+| **Reduce** | N → 1 | N GPUs send to 1 GPU | Aggregate (sum/avg/max) | Only 1 GPU gets the aggregated result; shape unchanged |
+| **All-Reduce** | N → N | N GPUs send, N GPUs receive | Aggregate (sum/avg/max) | Every GPU gets the **same** aggregated value; shape unchanged |
+| **All-Gather** | N → N | N GPUs send, N GPUs receive | Concatenate | Every GPU gets the **concatenation** of all GPUs' data; shape becomes N× |
+
+Both All-Reduce and All-Gather are N→N, but they differ in how received data is combined:
+
+```
+Example — 3 GPUs, each holds a length-2 vector:
+  GPU0: [1, 2]
+  GPU1: [3, 4]
+  GPU2: [5, 6]
+
+All-Reduce (sum):  every GPU gets [9, 12]          ← same shape, one aggregated value
+All-Gather:        every GPU gets [1,2, 3,4, 5,6]  ← N× larger, raw data concatenated
+```
+
+- **All-Reduce** = Reduce + Broadcast → used in data parallel for gradient sync
+- **All-Gather** = gather without reduce → used in tensor parallel to assemble a full activation/output
+
 # 2. Where is Bottleneck / State / Failure
 
 ### 2.1 Bottleneck
